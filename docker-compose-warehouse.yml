@@ -1,0 +1,50 @@
+version: '3'
+
+services:
+  db_warehouse:
+    image: postgres
+    environment:
+      - POSTGRES_USER=warehouse
+      - POSTGRES_PASSWORD=warehouse
+      - POSTGRES_DB=warehouse_db
+
+  web_warehouse:
+    build:
+      context: .
+      dockerfile: ./warehouse.Dockerfile
+    command: bash -c "python warehouse/manage.py migrate && python warehouse/manage.py runserver 0.0.0.0:8001 "
+    volumes:
+      - .:/code
+    ports:
+      - "8001:8001"
+    depends_on:
+      - db_warehouse
+    environment:
+      - DEBUG=1
+      - SECRET_KEY=haha
+      - SQL_DATABASE=warehouse_db
+      - SQL_USER=warehouse
+      - SQL_PASSWORD=warehouse
+      - SQL_HOST=db_warehouse
+      - SQL_PORT=5432
+  redis_warehouse:
+    image: "redis:alpine"
+  celery_warehouse:
+    environment:
+      - DEBUG=1
+      - SECRET_KEY=haha
+      - SQL_DATABASE=warehouse_db
+      - SQL_USER=warehouse
+      - SQL_PASSWORD=warehouse
+      - SQL_HOST=db_warehouse
+      - SQL_PORT=5432
+    build:
+      context: .
+      dockerfile: ./warehouse.Dockerfile
+    command: bash -c "cd warehouse && celery -A warehouse worker -l info"
+    volumes:
+      - .:/code
+    depends_on:
+      - db_warehouse
+      - redis_warehouse
+      - web_warehouse

@@ -1,0 +1,60 @@
+version: '3'
+
+services:
+  db_store:
+    image: postgres
+    environment:
+      - POSTGRES_USER=store
+      - POSTGRES_PASSWORD=store
+      - POSTGRES_DB=store_db
+    expose:
+      - "5433"
+    ports:
+      - "5433:5432"
+    command: -p 5433
+
+  web_store:
+    build:
+      context: .
+      dockerfile: ./store.Dockerfile
+    command: bash -c "python store/manage.py migrate && python store/manage.py runserver 0.0.0.0:8000 "
+    volumes:
+      - .:/code
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db_store
+    environment:
+      - DEBUG=1
+      - SECRET_KEY=haha
+      - SQL_DATABASE=store_db
+      - SQL_USER=store
+      - SQL_PASSWORD=store
+      - SQL_HOST=db_store
+      - SQL_PORT=5433
+      - STORE_NAME=test_store
+  redis_store:
+    image: "redis:alpine"
+  celery_store:
+    build:
+      context: .
+      dockerfile: ./store.Dockerfile
+    command: bash -c "cd store && celery -A store worker -l info"
+    environment:
+      - DEBUG=1
+      - SECRET_KEY=haha
+      - SQL_DATABASE=store_db
+      - SQL_USER=store
+      - SQL_PASSWORD=store
+      - SQL_HOST=db_store
+      - SQL_PORT=5433
+      - STORE_NAME=test_store
+    volumes:
+      - .:/code
+    links:
+      - db_store
+      - web_store
+    depends_on:
+      - db_store
+      - redis_store
+      - web_store
